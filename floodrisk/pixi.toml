@@ -1,0 +1,11 @@
+[workspace]
+authors = ["Pepijn <pepijn.schilperoort@wur.nl>"]
+channels = ["conda-forge"]
+name = "floodrisk"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+python = ">=3.14.7,<3.15"
