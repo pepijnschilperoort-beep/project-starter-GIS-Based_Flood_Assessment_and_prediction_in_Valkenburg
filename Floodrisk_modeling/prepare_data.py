@@ -20,8 +20,8 @@ def download_dtm(bbox: 'utils.BBox'):
     response = wcs.getCoverage(identifier='dtm_05m', bbox=bbox.bounds_rd, format='GEOTIFF',
                                crs='urn:ogc:def:crs:EPSG::28992', resx=5, resy=5)
 
-    make_path('output')
-    dtm_fn = 'output/dtm.tif'
+    make_path('tmp')
+    dtm_fn = 'tmp/dtm.tif'
     with open(dtm_fn, 'wb') as file:
         file.write(response.read())
 
@@ -35,8 +35,8 @@ def download_dsm(bbox: 'utils.BBox'):
     response = wcs.getCoverage(identifier='dsm_05m', bbox=bbox.bounds_rd, format='GEOTIFF',
                                crs='urn:ogc:def:crs:EPSG::28992', resx=5, resy=5)
 
-    make_path('output')
-    dsm_fn = 'output/dsm.tif'
+    make_path('tmp')
+    dsm_fn = 'tmp/dsm.tif'
     with open(dsm_fn, 'wb') as file:
         file.write(response.read())
 
@@ -75,11 +75,13 @@ def combine_dtm_dsm():
     )
     
     # 5. create output
-    output_path = "output/DEM.tif"
+    output_path = "tmp/DEM.tif"
     with rasterio.open(output_path, 'w', **dtm_meta) as file:
         file.write(dem, 1)
         
     return dem
+
+
 
 def prepare_data():
     """Extracts a bounds based on user input of a city then downloads elevation data
