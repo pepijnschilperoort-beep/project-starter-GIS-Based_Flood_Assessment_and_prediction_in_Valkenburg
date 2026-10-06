@@ -11,7 +11,10 @@ import osmnx as ox
 import pyproj
 from shapely.geometry import box
 from shapely.ops import transform
-
+from rasterio.transform import from_origin
+from rasterio.features import rasterize
+import rasterio
+import rasterio.plot
 class BBox:
     def __init__(self, placename=None, bounds_rd=None, epsg_code='28992'):
         self.epsg_code = epsg_code
@@ -82,7 +85,7 @@ def download(url, dest):
 
 download(BOFEK_URL,BOFEK_FILE)
 
-bofek = gpd.read_file("data/BOFEK2020.gpkg"
+bofek = gpd.read_file("data/bofek2020/BOFEK_2020.shp"
 )
 
 print("BOFEK CRS:", bofek.crs)
@@ -90,33 +93,137 @@ print("BOFEK columns:")
 print(bofek.columns.tolist())
 
 
+bofek = bofek.to_crs("EPSG:28992")
 
-
-SOIL_URL = (
-    "https://data.source.coop/cholmes/portolan-nl/vro/bodemkaart/"
-    "soilarea/soilarea.parquet"
+# Create a GeoDataFrame containing the bbox
+bbox_gdf = gpd.GeoDataFrame(
+    {"geometry": [bbox.geom_rd]},
+    crs="EPSG:28992"
 )
-DTM_PATH = "data/dtm.tif"                 # your AHN GeoTIFF (EPSG:28992)
-SOIL_CACHE = Path("data/soilarea.parquet")
-OUT_PATH = "data/infiltration_mm_h.tif"
 
-def download(url, dest):
-    dest = Path(dest)
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    if dest.exists():
-        return dest
-    part = dest.with_suffix(dest.suffix + ".part")
-    with requests.get(url, stream=True, timeout=60) as r:
-        r.raise_for_status()
-        with open(part, "wb") as f:
-            for chunk in r.iter_content(1 << 20):
-                f.write(chunk)
-    part.rename(dest)
-    return dest
+# Clip BOFEK polygons to the bbox
+bofek_clipped = gpd.clip(bofek, bbox_gdf)
 
-a=download(SOIL_URL,'data/soilarea.parquet')
-soil = gpd.read_parquet("data/soilarea.parquet")
+print("Original BOFEK polygons:", len(bofek))
+print("Clipped BOFEK polygons:", len(bofek_clipped))
 
-print(soil.head())
-print(soil.columns)
-print(soil.crs)
+# Save the clipped shapefile
+bofek_clipped.to_file(
+    "data/bofek2020/bofek2020_valkenburg.shp"
+)
+
+# Plot to check
+fig, ax = plt.subplots(figsize=(10, 10))
+bofek_clipped.plot(ax=ax, column='BOFEK2020', categorical=True,
+    legend=True,
+    edgecolor="black",
+    linewidth=0.5)
+bbox_gdf.boundary.plot(ax=ax, color="red", linewidth=2)
+
+plt.show()
+bofek_valkenburg=bofek_clipped
+
+ksat_table = pd.DataFrame({
+    "BOFEK2020": [
+        4013,
+        4016,
+        4018,
+        4019,
+        4020,
+        5002,
+        5004,
+        5007],
+    "Ksat": [
+        1.74,
+        3.0,
+        3.0,
+        6.31,
+        3.77,
+        0.99,
+        29.83,
+        6.31
+    ]
+})
+
+bofek_ksat = bofek_valkenburg.merge(
+    ksat_table,
+    on="BOFEK2020",
+    how="left"
+)
+bofek_ksat["Ksat"] = bofek_ksat["Ksat"].fillna(6)
+
+minx, miny, maxx, maxy = bbox.geom_rd.bounds
+resolution = 5
+transform = from_origin(
+    minx,
+    maxy,
+    resolution,
+    resolution
+)
+width = int(np.ceil((maxx - minx) / resolution))
+height = int(np.ceil((maxy - miny) / resolution))
+shapes = (
+    (geom, ksat)
+    for geom, ksat in zip(
+        bofek_ksat.geometry,
+        bofek_ksat["Ksat"]
+    )
+)
+ksat_raster = rasterize(
+    shapes=shapes,
+    out_shape=(height, width),
+    transform=transform,
+    fill=6,                 
+    dtype="float32"
+)
+
+output_file = "data/ksat_valkenburg_0.5m.tif"
+
+with rasterio.open(
+    output_file,
+    "w",
+    driver="GTiff",
+    height=height,
+    width=width,
+    count=1,
+    dtype="float32",
+    crs="EPSG:28992",
+    transform=transform
+) as dst:
+    dst.write(ksat_raster, 1)
+
+print(f"Saved: {output_file}")
+
+fig, ax = plt.subplots(figsize=(10, 10))
+
+rasterio.plot.show(
+    ksat_raster,
+    transform=transform,
+    ax=ax,
+    cmap="viridis"
+)
+
+ax.set_title("Ksat raster – 1 × 1 m")
+ax.set_xlabel("RD X (m)")
+ax.set_ylabel("RD Y (m)")
+
+plt.tight_layout()
+plt.show()
+
+cell_area = 5 * 5
+dt_hours = 1.0
+
+water=20
+infiltration_depth = ksat_raster / 2400.0  # m/hour
+
+# Potential infiltration volume per cell
+potential_infiltration = infiltration_depth * cell_area
+
+# Cannot infiltrate more than the water currently stored
+infiltration = np.minimum(
+    water,
+    potential_infiltration
+)
+
+# Update storage
+water -= infiltration
