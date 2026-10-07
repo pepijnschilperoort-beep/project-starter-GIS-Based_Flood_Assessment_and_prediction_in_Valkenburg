@@ -212,18 +212,78 @@ plt.show()
 
 cell_area = 5 * 5
 dt_hours = 1.0
+n_timesteps = 48
 
-water=20
-infiltration_depth = ksat_raster / 2400.0  # m/hour
+ksat_mm_h=ksat_raster/24*10
+surface_water = np.zeros_like(ksat_raster, dtype=np.float32)  # m/hour
+F_mm = np.zeros_like(ksat_raster, dtype=np.float32)
+f0_mm_h = 5
+F_decay_mm = 20.0
+rainfall_mm_h = np.zeros(n_timesteps)
+rainfall_mm_h[:] = 5.0
 
-# Potential infiltration volume per cell
-potential_infiltration = infiltration_depth * cell_area
-
-# Cannot infiltrate more than the water currently stored
-infiltration = np.minimum(
-    water,
-    potential_infiltration
+surface_water_history = np.zeros(
+    (n_timesteps + 1, *ksat_raster.shape),
+    dtype=np.float32
 )
 
-# Update storage
-water -= infiltration
+F_history = np.zeros(
+    (n_timesteps + 1, *ksat_raster.shape),
+    dtype=np.float32
+)
+
+surface_water_history[0] = surface_water
+F_history[0] = F_mm
+
+
+for t in range(n_timesteps):
+
+    # ----------------------------------------------
+    # 1. Add rainfall
+    # ----------------------------------------------
+
+    rainfall_depth_m = rainfall_mm_h[t] / 1000.0
+
+    rainfall_volume = rainfall_depth_m * cell_area
+
+    surface_water += rainfall_volume
+
+    # ----------------------------------------------
+    # 2. Calculate infiltration capacity
+    #
+    # f(F) = Ksat + (f0 - Ksat) * exp(-F/F_decay)
+    # ----------------------------------------------
+
+    infiltration_capacity_mm_h = (
+        ksat_mm_h
+        + (f0_mm_h - ksat_mm_h)
+        * np.exp(-F_mm / F_decay_mm)
+    )
+
+    potential_infiltration_mm = (
+        infiltration_capacity_mm_h * dt_hours
+    )
+
+    potential_infiltration_m = (
+        potential_infiltration_mm / 1000.0
+    )
+
+    potential_infiltration_volume = (
+        potential_infiltration_m * cell_area
+    )
+
+    infiltration_volume = np.minimum(
+        surface_water,
+        potential_infiltration_volume
+    )
+
+    surface_water -= infiltration_volume
+        
+    infiltration_depth_mm = (
+        infiltration_volume / cell_area * 1000.0
+    )
+
+    F_mm += infiltration_depth_mm
+
+    surface_water_history[t + 1] = surface_water
+    F_history[t + 1] = F_mm
