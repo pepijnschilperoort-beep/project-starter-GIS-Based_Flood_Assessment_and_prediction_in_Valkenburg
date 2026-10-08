@@ -33,6 +33,7 @@ def condition_dem(dem_path="tmp/DEM.tif"):
     
     return rd_dem
 
+# np.in1d is not supported so change it with np.isin
 if not hasattr(np, 'in1d'):
     np.in1d = np.isin
     
@@ -40,6 +41,10 @@ def route_flow(dem_path="tmp/filled_dem.tif"):
     """
     Uses PySheds to calculate D8 Flow Direction and Flow Accumulation.
     """
+    # np.in1d is not supported so change it with np.isin
+    if not hasattr(np, 'in1d'):
+        np.in1d = np.isin
+        
     # 1. Instantiate the grid directly from the TIFF
     grid = Grid.from_raster(dem_path)
     
@@ -60,5 +65,4 @@ def route_flow(dem_path="tmp/filled_dem.tif"):
     output_path = "tmp/flowdir.tif"
     grid.to_raster(flowdir, output_path)
     
-    print(f"Flow accumulation saved to: {output_path}")
     return flowdir
