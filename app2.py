@@ -34,20 +34,22 @@ if page == "Introduction":
 # ==========================================
 # Page 2: Simulation (Slider & Execution)
 # ==========================================
-elif page == "Simulation":
-    st.title("⚙️ Run Simulation")
-    st.write("Set the storm parameters below to calculate the new water heights.")
+elif page == "Simulation Dashboard":
+    st.title("⚙️ Flood Simulation")
     
-    # Slider for rainfall
-    rain_input = st.slider("Rainfall Amount (mm)", min_value=0.0, max_value=150.0, value=50.0, step=5.0)
+    # Split the screen: Controls on the left (25%), Map on the right (75%)
+    col_controls, col_map = st.columns([1, 3])
     
-    # Calculate Button
-    if st.button("Calculate Flood Routing", type="primary"):
-        # The spinner gives visual feedback while your heavy math runs
-        with st.spinner(f"Running local model iterations for {rain_input} mm of rain..."):
-            
-            try:
-                # --- CONNECT YOUR ENGINE HERE ---
+    with col_controls:
+        st.subheader("Storm Parameters")
+        rain_input = st.slider("Rainfall Amount (mm)", min_value=0.0, max_value=150.0, value=50.0, step=5.0)
+        
+        run_btn = st.button("Calculate Routing", type="primary", use_container_width=True)
+        
+    with col_map:
+        if run_btn:
+            with st.spinner(f"Simulating {rain_input} mm of rainfall..."):
+                # --- RUN YOUR ENGINE HERE ---
                 # import engine
                 # model = engine.CatchmentModel("tmp/Fused_DTM_DSM.tif")
                 # water_depth = model.run_iteration(rain_mm=rain_input, dt_seconds=60)
@@ -55,39 +57,42 @@ elif page == "Simulation":
                 # Simulating processing time for demonstration
                 time.sleep(2.5) 
                 
-                st.success("✅ Iteration complete! New cell values calculated.")
-                st.info("Check your 'output/' folder for the updated water height rasters.")
+                st.success("Simulation complete! Surface water accumulation rendered below.")
                 
-            except Exception as e:
-                st.error(f"An error occurred while running the script: {e}")
+                # Render the resulting output raster directly into the webpage
+                m = leafmap.Map(center=[51.9692, 5.6667], zoom=13)
+                
+                # Check if the output file actually exists to display it
+                output_raster = "output/Flow_Accumulation.tif"
+                if os.path.exists(output_raster):
+                    m.add_raster(output_raster, colormap="Blues", layer_name="Flood Accumulation")
+                else:
+                    m.add_basemap("OpenTopoMap")
+                    st.warning("Displaying basemap. Run the engine to generate the accumulation raster.")
+                    
+                m.to_streamlit(height=600)
+        else:
+            # Show a blank starting map before calculation
+            st.info("Adjust the parameters on the left and click Calculate to view the projection.")
+            m = leafmap.Map(center=[51.9692, 5.6667], zoom=13)
+            m.add_basemap("OpenStreetMap")
+            m.to_streamlit(height=600)
 
 # ==========================================
 # Page 3: Input Data
 # ==========================================
-elif page == "Input Data":
-    st.title("📂 Model Input Data")
-    st.write("The following datasets are currently registered in the local pipeline:")
+elif page == "Baseline Terrain":
+    st.title("🗺️ Baseline Terrain Model")
+    st.write("This map displays the conditioned elevation model (buildings acting as flow barriers) used as the foundation for the routing algorithms.")
     
-    # Create two columns for a cleaner layout
-    col1, col2 = st.columns(2)
+    # Render the input raster directly instead of showing file paths
+    m_input = leafmap.Map(center=[51.9692, 5.6667], zoom=13)
     
-    with col1:
-        st.subheader("Elevation & Terrain")
-        st.code("data/AHN_DTM.tif\ntmp/DEM.tif")
-        
-        # st.subheader("Hydrology")
-        # st.code("data/BGT_Waterdelen.gpkg")
-
-    with col2:
-        st.subheader("Dynamic Routing Grids")
-        st.code("tmp/Flow_Direction.tif\ntmp/Flow_Accumulation.tif")
-        
-        st.subheader("Surface Parameters")
-        st.code("data/Ksat_Infiltration.tif")
-        
-    # Optional: Check if a crucial file actually exists on the local machine
-    st.divider()
-    if os.path.exists("tmp/Fused_DTM_DSM.tif"):
-        st.success("Status: Fused DEM is ready on local disk.")
+    fused_dem = "tmp/DEM.tif"
+    if os.path.exists(fused_dem):
+        m_input.add_raster(fused_dem, colormap="terrain", layer_name="Conditioned Elevation")
     else:
-        st.warning("Status: Fused DEM not found. You may need to run the pre-processing step first.")
+        m_input.add_basemap("OpenTopoMap")
+        st.warning("Elevation model not found on disk. Displaying standard basemap.")
+        
+    m_input.to_streamlit(height=650)
