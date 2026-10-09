@@ -6,18 +6,19 @@ import numpy as np
 import time
 import os
 
-# Set up the overall page configuration
+from Floodrisk_modeling.prepare_data 
+from Floodrisk_modeling.DEM_engine import as engine
+
+
+
+# Set up of the page
 st.set_page_config(page_title="Flood Assessment Model", layout="wide")
 
-# ==========================================
-# Sidebar Navigation
-# ==========================================
+#navigation on the side
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Select a page:", ["Introduction", "Simulation", "Input Data"])
 
-# ==========================================
-# Page 1: Introduction
-# ==========================================
+#introduction to our project
 if page == "Introduction":
     st.title("🌧️ Pluvial Flood Assessment")
     st.markdown("""
@@ -82,47 +83,59 @@ elif page == "Simulation":
             st.pyplot(fig)
             plt.close(fig) # Close the figure to free up memory
 
-# ==========================================
-# Page 3: Input Data
-# ==========================================
+#page on the input of the model
 elif page == "Input Data":
-    st.title("📂 Model Input Data")
-    st.write("Current condition of the dynamic routing grids loaded into the pipeline:")
+    st.title("Model Input Data")
     
-    # Create the 3-panel plot
-    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+    # Define the required files
+    required_files = ["tmp/DEM.tif", "tmp/flowdir.tif", "tmp/accumulation.tif"]
+    
+    # Check if all files exist
+    data_ready = all(os.path.exists(f) for f in required_files)
+    
+    if data_ready:
+        st.write("input data for model")
+        
+        # Create the 3-panel plot
+        fig, axes = plt.subplots(1, 3, figsize=(18, 6))
 
-    # 1. Conditioned DEM
-    if os.path.exists("tmp/DEM.tif"):
         with rasterio.open("tmp/DEM.tif") as src:
             show(src, ax=axes[0], cmap="terrain", title="1. Conditioned DEM\n(Elevation)")
-    else:
-        axes[0].text(0.5, 0.5, "tmp/DEM.tif not found", ha='center')
-        axes[0].axis("off")
 
-    # 2. Flow Direction
-    if os.path.exists("tmp/flowdir.tif"):
         with rasterio.open("tmp/flowdir.tif") as src:
             show(src, ax=axes[1], cmap="tab10", title="2. Flow Direction\n(D8 Pointers)")
-    else:
-        axes[1].text(0.5, 0.5, "tmp/flowdir.tif not found", ha='center')
-        axes[1].axis("off")
 
-    # 3. Flow Accumulation
-    if os.path.exists("tmp/accumulation.tif"):
         with rasterio.open("tmp/accumulation.tif") as src:
             acc_data = src.read(1)
-            # Log transform for visibility of stream network
             acc_log = np.log1p(np.where(acc_data > 0, acc_data, 0))
             axes[2].imshow(acc_log, cmap="Blues")
             axes[2].set_title("3. Flow Accumulation\n(Log Scale)")
             axes[2].axis("off")
-    else:
-        axes[2].text(0.5, 0.5, "tmp/accumulation.tif not found", ha='center')
-        axes[2].axis("off")
 
-    plt.tight_layout()
-    
-    # Inject the multi-panel plot into Streamlit
-    st.pyplot(fig)
-    plt.close(fig) # Close the figure to free up memory
+        plt.tight_layout()
+        st.pyplot(fig)
+        plt.close(fig)
+        
+    else:
+        # The ELSE statement: Trigger pipeline if data is missing
+        st.warning("⚠️ Required input data not found. Running the initialization pipeline...")
+        
+        with st.status("Building spatial arrays from raw data...", expanded=True) as status:
+            try:
+                st.write("dem will be retrieved")
+                prepare.prepare_data()
+
+                st.write("dem will be retrieved")
+                engine.prepare_DEM()
+
+                st.write("Calculating flow direction and accumulation...")
+                engine.route_flow()
+                
+                time.sleep(1)
+                
+                # Rerun the application to instantly load and plot the newly created files
+                st.rerun()
+                
+            except Exception as e:
+                status.update(label="❌ Pipeline failed to initialize.", state="error")
+                st.error(f"Error details: {e}")
