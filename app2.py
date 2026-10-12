@@ -6,8 +6,8 @@ import numpy as np
 import time
 import os
 
-from Floodrisk_modeling.prepare_data 
-from Floodrisk_modeling.DEM_engine import as engine
+from Floodrisk_modeling import prepare_data as pr
+from Floodrisk_modeling import DEM_engine as engine
 
 
 
@@ -42,46 +42,46 @@ elif page == "Simulation":
     st.title("⚙️ Run Simulation")
     st.write("Set the storm parameters below to calculate the new water heights.")
     
-    # Slider for rainfall
-    rain_input = st.slider("Rainfall Amount (mm)", min_value=0.0, max_value=150.0, value=50.0, step=5.0)
+    # # Slider for rainfall
+    # rain_input = st.slider("Rainfall Amount (mm)", min_value=0.0, max_value=150.0, value=50.0, step=5.0)
     
-    # Calculate Button
-    if st.button("Calculate Flood Risk", type="primary"):
-        with st.spinner(f"Running iteration for {rain_input} mm of rain..."):
+    # # Calculate Button
+    # if st.button("Calculate Flood Risk", type="primary"):
+    #     with st.spinner(f"Running iteration for {rain_input} mm of rain..."):
             
-            # --- CONNECT YOUR ENGINE HERE ---
-            # import engine
-            # model = engine.CatchmentModel("tmp/DEM.tif")
-            # final_water_depth = model.run_iteration(rain_mm=rain_input, dt_seconds=60)
-            # model.export_raster(final_water_depth, "output/flood_risk.tif")
+    #         # --- CONNECT YOUR ENGINE HERE ---
+    #         # import engine
+    #         # model = engine.CatchmentModel("tmp/DEM.tif")
+    #         # final_water_depth = model.run_iteration(rain_mm=rain_input, dt_seconds=60)
+    #         # model.export_raster(final_water_depth, "output/flood_risk.tif")
             
-            # Simulating processing time
-            time.sleep(2) 
-            st.success("✅ Iteration complete! Generating Flood Risk Map...")
+    #         # Simulating processing time
+    #         time.sleep(2) 
+    #         st.success("✅ Iteration complete! Generating Flood Risk Map...")
             
-            # Plot the resulting flood risk map
-            # (Assuming your engine outputs a file called flood_risk.tif or similar)
-            output_file = "output/flood_risk.tif"
+    #         # Plot the resulting flood risk map
+    #         # (Assuming your engine outputs a file called flood_risk.tif or similar)
+    #         output_file = "output/flood_risk.tif"
             
-            fig, ax = plt.subplots(figsize=(10, 8))
-            if os.path.exists(output_file):
-                with rasterio.open(output_file) as src:
-                    # Mask out areas with zero water so the basemap/background shows through
-                    data = src.read(1)
-                    water_data = np.ma.masked_where(data <= 0.01, data)
+    #         fig, ax = plt.subplots(figsize=(10, 8))
+    #         if os.path.exists(output_file):
+    #             with rasterio.open(output_file) as src:
+    #                 # Mask out areas with zero water so the basemap/background shows through
+    #                 data = src.read(1)
+    #                 water_data = np.ma.masked_where(data <= 0.01, data)
                     
-                    im = ax.imshow(water_data, cmap="Blues")
-                    ax.set_title(f"Flood Risk Map ({rain_input} mm event)")
-                    fig.colorbar(im, ax=ax, label="Water Depth (mm)")
-                    ax.axis("off")
-            else:
-                # Placeholder if the engine isn't connected yet
-                ax.text(0.5, 0.5, "output/flood_risk.tif not found.\n(Connect your engine.py to generate it)", 
-                        ha='center', va='center', fontsize=12)
-                ax.axis("off")
+    #                 im = ax.imshow(water_data, cmap="Blues")
+    #                 ax.set_title(f"Flood Risk Map ({rain_input} mm event)")
+    #                 fig.colorbar(im, ax=ax, label="Water Depth (mm)")
+    #                 ax.axis("off")
+    #         else:
+    #             # Placeholder if the engine isn't connected yet
+    #             ax.text(0.5, 0.5, "output/flood_risk.tif not found.\n(Connect your engine.py to generate it)", 
+    #                     ha='center', va='center', fontsize=12)
+    #             ax.axis("off")
                 
-            st.pyplot(fig)
-            plt.close(fig) # Close the figure to free up memory
+    #         st.pyplot(fig)
+    #         plt.close(fig) # Close the figure to free up memory
 
 #page on the input of the model
 elif page == "Input Data":
@@ -123,7 +123,7 @@ elif page == "Input Data":
         with st.status("Building spatial arrays from raw data...", expanded=True) as status:
             try:
                 st.write("dem will be retrieved")
-                prepare.prepare_data()
+                pr.prepare_data()
 
                 st.write("dem will be retrieved")
                 engine.prepare_DEM()
